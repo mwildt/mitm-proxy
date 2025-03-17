@@ -10,9 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
-	"strings"
 )
 
 type Server struct {
@@ -100,38 +98,6 @@ func (proxy *Server) acceptConnection(connection net.Conn) {
 	}
 }
 
-func getTargetHost(request *http.Request) (string, string, error) {
-	connectHost := request.Host
-	if !strings.Contains(connectHost, "://") {
-		connectHost = "none://" + connectHost
-	}
-
-	if parsedUrl, err := url.Parse(connectHost); err != nil {
-		return "", "", fmt.Errorf("fehler beim parsen host: %v", err)
-	} else {
-		port := parsedUrl.Port()
-		if port == "" {
-			if parsedUrl.Scheme == "https" {
-				port = "443"
-			} else {
-				port = "80"
-			}
-		}
-		return parsedUrl.Hostname(), port, nil
-	}
-}
-
-type Session struct {
-	UpstreamHost     string
-	UpstreamPort     string
-	ClientConnection net.Conn
-	Request          *http.Request
-}
-
-func (requestContext *Session) upstreamAddress() string {
-	return requestContext.UpstreamHost + ":" + requestContext.UpstreamPort
-}
-
 func (proxy *Server) handleRequest(context Session) error {
 	proxy.logger.Printf("handle Request from %s to %s via %s",
 		context.ClientConnection.RemoteAddr().String(),
@@ -157,7 +123,7 @@ func (proxy *Server) handleConnect(clientConn net.Conn, connectRequest *http.Req
 	if _, err := clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n")); err != nil {
 		return fmt.Errorf("Fehler beim Senden der Bestätigung: %v", err)
 	}
-	targetHost, targetPort, err := getTargetHost(connectRequest)
+	targetHost, targetPort, err := targetHostPort(connectRequest)
 	if err != nil {
 		return fmt.Errorf("unable to determin target host from connect Request: %v", err)
 	}
@@ -183,7 +149,7 @@ func (proxy *Server) handleConnect(clientConn net.Conn, connectRequest *http.Req
 
 func (proxy *Server) handleHttp(clientConn net.Conn, request *http.Request) error {
 	proxy.logger.Printf("handle http Request from %s: %s", clientConn.RemoteAddr().String(), request.RequestURI)
-	targetHost, targetPort, err := getTargetHost(request)
+	targetHost, targetPort, err := targetHostPort(request)
 	if err != nil {
 		return fmt.Errorf("unable to determin target host from connect Request: %v", err)
 	}

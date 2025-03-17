@@ -1,14 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/mwildt/go-mitm/pkg/proxy"
-	"io"
 	"log"
 	"net/http"
 	"os"
-	"strings"
 )
 
 func main() {
@@ -20,33 +17,28 @@ func main() {
 		return
 	}
 
-	server, err := proxy.NewServer(func(session proxy.Session) (*http.Response, error) {
-
-		if strings.HasPrefix(session.UpstreamHost, "demo.local.host") {
-
-			handler := proxy.LogRequest(proxy.LogResponse(proxy.StaticResponse(
-				&http.Response{
-					StatusCode: http.StatusOK,
-					Status:     fmt.Sprintf("%d %s", http.StatusOK, "Response from Server"),
-					Proto:      "HTTP/1.1",
-					ProtoMajor: 1,
-					ProtoMinor: 1,
-					Header: http.Header{
-						"x-proxy-version": []string{"v.0.0.0"},
-					},
-					Body:    io.NopCloser(bytes.NewReader(nil)),
-					Request: session.Request,
-				})))
-			return handler(session)
-
+	coreHandler := func(session proxy.Session) proxy.HandlerFunc {
+		if session.MatchHost("demo.local.host") {
+			return proxy.StaticResponse(http.StatusOK, "OK from Proxy")
+		} else if session.MatchHost("*.google.com") {
+			return proxy.Blocked()
 		} else {
-			handler := proxy.LogRequest(proxy.LogResponse(proxy.Forward()))
-			return handler(session)
+			return proxy.Forward()
 		}
-	})
+	}
+
+	handler := proxy.LogRequest(proxy.LogResponse(Wrap(coreHandler)))
+
+	server, err := proxy.NewServer(handler)
 
 	if err != nil {
 		log.Fatalf("err %v", err)
 	}
 	log.Fatalf("err %v", server.Listen(":8888"))
+}
+
+func Wrap(handler func(session proxy.Session) proxy.HandlerFunc) proxy.HandlerFunc {
+	return func(session proxy.Session) (*http.Response, error) {
+		return handler(session)(session)
+	}
 }

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -74,8 +75,32 @@ func Forward() HandlerFunc {
 	}
 }
 
-func StaticResponse(response *http.Response) HandlerFunc {
-	return func(rctx Session) (*http.Response, error) {
-		return response, nil
+func Blocked() HandlerFunc {
+	return func(session Session) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusForbidden,
+			Status:     fmt.Sprintf("%d %s", http.StatusForbidden, "Blocked by Proxy"),
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Header:     http.Header{},
+			Body:       io.NopCloser(bytes.NewReader(nil)),
+			Request:    session.Request,
+		}, nil
+	}
+}
+
+func StaticResponse(statusCode int, status string) HandlerFunc {
+	return func(session Session) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: statusCode,
+			Status:     fmt.Sprintf("%d %s", statusCode, status),
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Header:     http.Header{},
+			Body:       io.NopCloser(bytes.NewReader(nil)),
+			Request:    session.Request,
+		}, nil
 	}
 }
