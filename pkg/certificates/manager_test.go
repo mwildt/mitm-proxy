@@ -1,4 +1,4 @@
-package main
+package certificates
 
 import (
 	"crypto/tls"
@@ -10,7 +10,6 @@ import (
 )
 
 func TestCertificateManager_wtf(t *testing.T) {
-
 	connectHost := "ab.chatgpt.com:443"
 	if !strings.Contains(connectHost, "://") {
 		connectHost = "none://" + connectHost
@@ -26,7 +25,7 @@ func TestCertificateManager_wtf(t *testing.T) {
 
 func TestCertificateManager(t *testing.T) {
 
-	cm := &CertificateManager{}
+	cm := &Manager{}
 	if err := cm.init(); err != nil {
 		t.Errorf(err.Error())
 	}
